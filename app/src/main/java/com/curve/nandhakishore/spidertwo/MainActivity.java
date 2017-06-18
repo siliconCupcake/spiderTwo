@@ -11,9 +11,12 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
+import android.os.Message;
 import android.os.SystemClock;
 import android.util.Log;
 import android.widget.TextView;
+
+import java.util.Timer;
 
 public class MainActivity extends Activity {
 
@@ -21,12 +24,29 @@ public class MainActivity extends Activity {
     Sensor proxySensor;
     SensorEventListener proxyListener;
     MediaPlayer mediaPlayer;
-    CountDownTimer timer;
-    Boolean isRunning = false;
     TextView displayTime;
     int second, millisecond;
     long startTime, elapsedTime;
     Handler handler;
+
+    public class cTimer extends Thread {
+        @Override
+        public void run() {
+            elapsedTime = SystemClock.uptimeMillis() - startTime;
+            if(elapsedTime < 5001) {
+                calcTime(5000 - elapsedTime);
+                Message running = new Message();
+                running.what = 0;
+                handler.sendMessage(running);
+            }
+            else{
+                Message finished = new Message();
+                finished.what = 1;
+                handler.sendMessage(finished);
+            }
+            super.run();
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,38 +58,35 @@ public class MainActivity extends Activity {
         proxySensor = sManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
         mediaPlayer = MediaPlayer.create(this, R.raw.coin);
         mediaPlayer.setLooping(true);
+        final cTimer CT = new cTimer();
 
-        handler = new Handler();
-
-       /* timer = new CountDownTimer(5000, 10) {
+        handler = new Handler(){
             @Override
-            public void onTick(long l) {
-                calcTime(l);
-                displayTime.setText(String.format("%02d", second) + ":" + String.format("%02d", millisecond));
-                isRunning = true;
+            public void handleMessage(Message msg) {
+                if(msg.what == 0){
+                    displayTime.setText(String.valueOf(second + 1));
+                    CT.start();
+                }
+                else if(msg.what == 1){
+                    displayTime.setText("0");
+                    mediaPlayer.start();
+                }
+                super.handleMessage(msg);
             }
+        };
 
-            @Override
-            public void onFinish() {
-                mediaPlayer.start();
-                displayTime.setText("00:00");
-                isRunning = false;
-            }
-
-        }; */
-
-       proxyListener = new SensorEventListener() {
+        proxyListener = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent sensorEvent) {
                 if(sensorEvent.values[0] < proxySensor.getMaximumRange()) {
                     getWindow().getDecorView().setBackgroundColor(Color.rgb(211, 47, 47));
+                    startTime=SystemClock.uptimeMillis();
+                    elapsedTime=0;
                     displayTime.setText("5");
-                    startTime = SystemClock.uptimeMillis();
-                    handler.post(cTimer);
+                    CT.start();
                 }
                 else {
                     getWindow().getDecorView().setBackgroundColor(Color.rgb(56, 142, 60));
-                    handler.removeCallbacks(cTimer);
                     displayTime.setText("5");
                     if(mediaPlayer.isPlaying()) {
                         mediaPlayer.stop();
@@ -89,23 +106,6 @@ public class MainActivity extends Activity {
         sManager.registerListener(proxyListener, proxySensor, 500 * 1000);
     }
 
-    public Runnable cTimer = new Runnable() {
-        @Override
-        public void run() {
-            elapsedTime = SystemClock.uptimeMillis() - startTime;
-            if(elapsedTime < 5001) {
-                calcTime(5000 - elapsedTime);
-                Log.e("Time remaining", String.format("%02d", second) + ":" + String.format("%01d", millisecond));
-                displayTime.setText(String.valueOf(second + 1));
-                handler.post(this);
-            }
-            else{
-                displayTime.setText("0");
-                mediaPlayer.start();
-            }
-        }
-    };
-
     @Override
     protected void onResume() {
         sManager.registerListener(proxyListener, proxySensor, 500 * 1000);
@@ -114,14 +114,10 @@ public class MainActivity extends Activity {
 
     private void calcTime(long l){
         second = (int) l / 1000;
-        millisecond = (int) (l % 1000) / 100 ;
     }
 
     @Override
     protected void onPause() {
-        if (isRunning) {
-            timer.cancel();
-        }
         if(mediaPlayer.isPlaying()) {
             mediaPlayer.stop();
             try{
