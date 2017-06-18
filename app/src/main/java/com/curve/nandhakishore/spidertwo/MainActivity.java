@@ -10,6 +10,8 @@ import android.media.MediaPlayer;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.os.Handler;
+import android.os.SystemClock;
 import android.util.Log;
 import android.widget.TextView;
 
@@ -20,9 +22,11 @@ public class MainActivity extends Activity {
     SensorEventListener proxyListener;
     MediaPlayer mediaPlayer;
     CountDownTimer timer;
+    Boolean isRunning = false;
     TextView displayTime;
     int second, millisecond;
-    Boolean isRunning = false;
+    long startTime, elapsedTime;
+    Handler handler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,7 +39,9 @@ public class MainActivity extends Activity {
         mediaPlayer = MediaPlayer.create(this, R.raw.coin);
         mediaPlayer.setLooping(true);
 
-        timer = new CountDownTimer(5000, 10) {
+        handler = new Handler();
+
+       /* timer = new CountDownTimer(5000, 10) {
             @Override
             public void onTick(long l) {
                 calcTime(l);
@@ -50,24 +56,21 @@ public class MainActivity extends Activity {
                 isRunning = false;
             }
 
-        };
+        }; */
 
-        proxyListener = new SensorEventListener() {
+       proxyListener = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent sensorEvent) {
-                Log.e("PROXIMITY", String.valueOf(sensorEvent.values[0]));
                 if(sensorEvent.values[0] < proxySensor.getMaximumRange()) {
-                    getWindow().getDecorView().setBackgroundColor(0xC62828);
-                    displayTime.setText("05:00");
-                    timer.start();
+                    getWindow().getDecorView().setBackgroundColor(Color.rgb(211, 47, 47));
+                    displayTime.setText("5");
+                    startTime = SystemClock.uptimeMillis();
+                    handler.post(cTimer);
                 }
                 else {
-                    getWindow().getDecorView().setBackgroundColor(0x2E7D32);
-                    Log.e("MPlayer", String.valueOf(mediaPlayer.isPlaying()));
-                    if (isRunning) {
-                        timer.cancel();
-                    }
-                    displayTime.setText("05:00");
+                    getWindow().getDecorView().setBackgroundColor(Color.rgb(56, 142, 60));
+                    handler.removeCallbacks(cTimer);
+                    displayTime.setText("5");
                     if(mediaPlayer.isPlaying()) {
                         mediaPlayer.stop();
                         try{
@@ -86,6 +89,23 @@ public class MainActivity extends Activity {
         sManager.registerListener(proxyListener, proxySensor, 500 * 1000);
     }
 
+    public Runnable cTimer = new Runnable() {
+        @Override
+        public void run() {
+            elapsedTime = SystemClock.uptimeMillis() - startTime;
+            if(elapsedTime < 5001) {
+                calcTime(5000 - elapsedTime);
+                Log.e("Time remaining", String.format("%02d", second) + ":" + String.format("%01d", millisecond));
+                displayTime.setText(String.valueOf(second + 1));
+                handler.post(this);
+            }
+            else{
+                displayTime.setText("0");
+                mediaPlayer.start();
+            }
+        }
+    };
+
     @Override
     protected void onResume() {
         sManager.registerListener(proxyListener, proxySensor, 500 * 1000);
@@ -94,7 +114,7 @@ public class MainActivity extends Activity {
 
     private void calcTime(long l){
         second = (int) l / 1000;
-        millisecond = (int) (l - (second*1000))/10;
+        millisecond = (int) (l % 1000) / 100 ;
     }
 
     @Override
