@@ -7,16 +7,12 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.media.MediaPlayer;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Message;
 import android.os.SystemClock;
 import android.util.Log;
 import android.widget.TextView;
-
-import java.util.Timer;
 
 public class MainActivity extends Activity {
 
@@ -28,21 +24,23 @@ public class MainActivity extends Activity {
     int second, millisecond;
     long startTime, elapsedTime;
     Handler handler;
+    Boolean isRunning = false;
 
     public class cTimer extends Thread {
         @Override
         public void run() {
-            elapsedTime = SystemClock.uptimeMillis() - startTime;
-            if(elapsedTime < 5001) {
-                calcTime(5000 - elapsedTime);
-                Message running = new Message();
-                running.what = 0;
-                handler.sendMessage(running);
-            }
-            else{
-                Message finished = new Message();
-                finished.what = 1;
-                handler.sendMessage(finished);
+            if(isRunning) {
+                elapsedTime = SystemClock.uptimeMillis() - startTime;
+                if (elapsedTime < 5001) {
+                    calcTime(5000 - elapsedTime);
+                    Message running = new Message();
+                    running.what = 0;
+                    handler.sendMessage(new Message());
+                } else {
+                    Message finished = new Message();
+                    finished.what = 1;
+                    handler.sendMessage(finished);
+                }
             }
             super.run();
         }
@@ -58,6 +56,7 @@ public class MainActivity extends Activity {
         proxySensor = sManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
         mediaPlayer = MediaPlayer.create(this, R.raw.coin);
         mediaPlayer.setLooping(true);
+
         final cTimer CT = new cTimer();
 
         handler = new Handler(){
@@ -65,6 +64,8 @@ public class MainActivity extends Activity {
             public void handleMessage(Message msg) {
                 if(msg.what == 0){
                     displayTime.setText(String.valueOf(second + 1));
+                    if(!isRunning)
+                        displayTime.setText("5");
                     CT.start();
                 }
                 else if(msg.what == 1){
@@ -79,15 +80,16 @@ public class MainActivity extends Activity {
             @Override
             public void onSensorChanged(SensorEvent sensorEvent) {
                 if(sensorEvent.values[0] < proxySensor.getMaximumRange()) {
+                    isRunning = true;
                     getWindow().getDecorView().setBackgroundColor(Color.rgb(211, 47, 47));
-                    startTime=SystemClock.uptimeMillis();
-                    elapsedTime=0;
+                    startTime = SystemClock.uptimeMillis();
+                    elapsedTime = 0;
                     displayTime.setText("5");
                     CT.start();
                 }
                 else {
                     getWindow().getDecorView().setBackgroundColor(Color.rgb(56, 142, 60));
-                    displayTime.setText("5");
+                    isRunning = false;
                     if(mediaPlayer.isPlaying()) {
                         mediaPlayer.stop();
                         try{
@@ -96,6 +98,7 @@ public class MainActivity extends Activity {
                             err.printStackTrace();
                         }
                     }
+                    displayTime.setText("5");
                 }
             }
 
@@ -103,7 +106,7 @@ public class MainActivity extends Activity {
             public void onAccuracyChanged(Sensor sensor, int i) {
             }
         };
-        sManager.registerListener(proxyListener, proxySensor, 500 * 1000);
+        sManager.registerListener(proxyListener, proxySensor, 250 * 1000);
     }
 
     @Override
@@ -114,6 +117,7 @@ public class MainActivity extends Activity {
 
     private void calcTime(long l){
         second = (int) l / 1000;
+        millisecond = (int) (l % 1000) / 100 ;
     }
 
     @Override
