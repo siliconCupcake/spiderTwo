@@ -40,9 +40,18 @@ public class MainActivity extends Activity {
                     Message finished = new Message();
                     finished.what = 1;
                     handler.sendMessage(finished);
+                    mediaPlayer.start();
+                }
+            } else {
+                if(mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                    try{
+                        mediaPlayer.prepare();
+                    }catch (Exception err){
+                        err.printStackTrace();
+                    }
                 }
             }
-            super.run();
         }
     }
 
@@ -57,7 +66,6 @@ public class MainActivity extends Activity {
         mediaPlayer = MediaPlayer.create(this, R.raw.coin);
         mediaPlayer.setLooping(true);
 
-        final cTimer CT = new cTimer();
 
         handler = new Handler(){
             @Override
@@ -66,11 +74,10 @@ public class MainActivity extends Activity {
                     displayTime.setText(String.valueOf(second + 1));
                     if(!isRunning)
                         displayTime.setText("5");
-                    CT.start();
+                    new cTimer().start();
                 }
                 else if(msg.what == 1){
                     displayTime.setText("0");
-                    mediaPlayer.start();
                 }
                 super.handleMessage(msg);
             }
@@ -85,19 +92,13 @@ public class MainActivity extends Activity {
                     startTime = SystemClock.uptimeMillis();
                     elapsedTime = 0;
                     displayTime.setText("5");
-                    CT.start();
+                    new cTimer().start();
                 }
                 else {
                     getWindow().getDecorView().setBackgroundColor(Color.rgb(56, 142, 60));
                     isRunning = false;
-                    if(mediaPlayer.isPlaying()) {
-                        mediaPlayer.stop();
-                        try{
-                            mediaPlayer.prepare();
-                        }catch (Exception err){
-                            err.printStackTrace();
-                        }
-                    }
+                    Log.e("Far", String.valueOf(mediaPlayer.isPlaying()));
+                    new cTimer().start();
                     displayTime.setText("5");
                 }
             }
@@ -122,14 +123,8 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
-        if(mediaPlayer.isPlaying()) {
-            mediaPlayer.stop();
-            try{
-                mediaPlayer.prepare();
-            }catch (Exception err){
-                err.printStackTrace();
-            }
-        }
+        isRunning = false;
+        new cTimer().start();
         sManager.unregisterListener(proxyListener);
         super.onPause();
     }
